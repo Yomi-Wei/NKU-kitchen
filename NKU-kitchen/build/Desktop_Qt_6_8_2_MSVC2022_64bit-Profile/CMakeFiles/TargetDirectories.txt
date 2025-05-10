@@ -1,0 +1,8 @@
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/Try.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/edit_cache.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/rebuild_cache.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/list_install_components.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/install.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/install/local.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/Try_autogen_timestamp_deps.dir
+C:/Users/lenovo/Documents/Try/build/Desktop_Qt_6_8_2_MSVC2022_64bit-Profile/CMakeFiles/Try_autogen.dir
