@@ -5,7 +5,13 @@
         <file>lettuce_raw.png</file>
         <file>tomato_cut.png</file>
         <file>lettuce_sliced.png</file>
-        <file>salad_final.png</file>
         <file>kitchen_background.png</file>
+        <file>salad_final.png</file>
+        <file>start_background.jpg</file>
+        <file>meat_cut.png</file>
+        <file>meat_raw.png</file>
+        <file>meat_fried.png</file>
+        <file>bread_slice.png</file>
+        <file>burger_final.png</file>
     </qresource>
 </RCC>

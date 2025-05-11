@@ -1,5 +1,5 @@
 #include "servinghatchitem.h"
-#include "item_definitions.h" // 包含常量定义
+#include "item_definitions.h" // 确保包含
 #include <QDebug>
 
 ServingHatchItem::ServingHatchItem(const QPixmap& pixmap, QGraphicsItem *parent)
@@ -11,13 +11,18 @@ ServingHatchItem::ServingHatchItem(const QPixmap& pixmap, QGraphicsItem *parent)
 
 bool ServingHatchItem::serveOrder(const QString& itemName)
 {
-    if (itemName == PRODUCT_SALAD) { // 假设 PRODUCT_SALAD = "沙拉" 在 item_definitions.h 中定义
+    // 检查是否是沙拉或汉堡
+    if (itemName == PRODUCT_SALAD) {
         qDebug() << "上菜口：收到一份 '" << itemName << "'!";
-        // 实际游戏中，这里可能还会有更复杂的订单匹配逻辑
-        emit orderServed(itemName, 20); // 发出信号，增加20分
+        emit orderServed(itemName, 20); // 沙拉20分
+        return true;
+    } else if (itemName == PRODUCT_BURGER) {
+        qDebug() << "上菜口：收到一份 '" << itemName << "'!";
+        emit orderServed(itemName, 50); // 汉堡可以给更多分，例如50分
         return true;
     } else {
-        qDebug() << "上菜口：不接受 '" << itemName << "'。只接受沙拉。";
+        qDebug() << "上菜口：不接受 '" << itemName << "'。只接受沙拉或汉堡。";
         return false;
     }
 }
+

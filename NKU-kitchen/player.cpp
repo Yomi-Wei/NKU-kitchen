@@ -1,66 +1,58 @@
-// player.cpp
 #include "player.h"
-#include "choppingstationitem.h"      // 确保这些类的前向声明在 player.h 中，完整包含在这里
-#include "saladassemblystationitem.h" // 确保这些类的前向声明在 player.h 中，完整包含在这里
-#include "servinghatchitem.h"         // 确保这些类的前向声明在 player.h 中，完整包含在这里
+#include "choppingstationitem.h"
+#include "saladassemblystationitem.h"
+#include "servinghatchitem.h"
+#include "fryingstationitem.h"
+#include "item_definitions.h"
 #include <QPixmap>
 #include <QDebug>
 #include <QKeyEvent>
 #include <QGraphicsScene>
 
-// --- 图片路径映射表 ---
-// (确保这些路径与你的 .qrc 文件中的资源路径一致)
-// (确保 item_definitions.h 中的 PRODUCT_SALAD 常量已定义，例如 const QString PRODUCT_SALAD = "沙拉";)
-QMap<QString, QString> Player_ItemBaseImagePaths_map_cpp = {
-    {"西红柿", ":/images/tomato_raw.png"},
-    {"生菜", ":/images/lettuce_raw.png"},
-    {PRODUCT_SALAD, ":/images/salad_final.png"} // 使用常量
-};
-QMap<QString, QString> Player_ItemCutImagePaths_map_cpp = {
-    {"西红柿", ":/images/tomato_cut.png"},
-    {"生菜", ":/images/lettuce_sliced.png"}
+QMap<QString, QString> Player_ItemImagePaths_map_cpp = {
+    {RAW_TOMATO, ":/images/tomato_raw.png"},
+    {RAW_LETTUCE, ":/images/lettuce_raw.png"},
+    {RAW_MEAT, ":/images/meat_raw.png"},
+    {BREAD_SLICE, ":/images/bread_slice.png"},
+
+    {CUT_TOMATO, ":/images/tomato_cut.png"},
+    {CUT_LETTUCE, ":/images/lettuce_sliced.png"},
+    {CUT_MEAT, ":/images/meat_cut.png"},
+
+    {FRIED_MEAT, ":/images/meat_fried.png"},
+
+    {PRODUCT_SALAD, ":/images/salad_final.png"},
+    {PRODUCT_BURGER, ":/images/burger_final.png"}
 };
 
-// --- Player 类的静态成员函数定义 ---
 QString Player::getImagePathForItem(const QString& itemName) {
-    QString baseName = itemName;
-    bool isCut = false;
-    if (itemName.endsWith("_已切")) {
-        baseName.chop(3); // 移除 "_已切" 后缀
-        isCut = true;
-    }
-
-    if (isCut) {
-        return Player_ItemCutImagePaths_map_cpp.value(baseName, QString());
-    } else {
-        return Player_ItemBaseImagePaths_map_cpp.value(baseName, QString());
-    }
+    return Player_ItemImagePaths_map_cpp.value(itemName, QString());
 }
 
-// --- Player 类的构造函数定义 ---
 Player::Player(const QString &pixmapPath, qreal speed, QGraphicsItem *parent)
-    : QObject(), QGraphicsPixmapItem(parent), m_moveSpeed(speed), m_maxVisualHeldItems(3)
+    : QObject(), QGraphicsPixmapItem(parent), m_moveSpeed(speed),
+    m_maxVisualHeldItems(3), m_isBusyWithStation(false)
 {
     QPixmap originalPixmap(pixmapPath);
     if (originalPixmap.isNull()) {
         qWarning() << "错误：从路径加载玩家图片失败：" << pixmapPath;
-        QPixmap fallbackPixmap(50, 50); // 你之前截图的 player.h 默认 speed=15, 这里是 50x50
-        fallbackPixmap.fill(Qt::red);
-        setPixmap(fallbackPixmap);
-        qWarning() << "已使用备用红色方块作为玩家。";
+        QPixmap fallbackPixmap(50, 50); fallbackPixmap.fill(Qt::red); setPixmap(fallbackPixmap);
     } else {
-        // 你之前上传的 player.cpp 中图片缩放是 100,100。
-        // 我之前的示例是 50,50。请根据你的期望调整。
-        QPixmap scaledPixmap = originalPixmap.scaled(100, 100, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        QPixmap scaledPixmap = originalPixmap.scaled(100,100, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         setPixmap(scaledPixmap);
-        qDebug() << "玩家图片已加载并缩放。尺寸：" << pixmap().size();
     }
 }
 
-// --- Player 类的其他成员函数定义 ---
+bool Player::isBusy() const {
+    return m_isBusyWithStation;
+}
+
 void Player::handleMovementKey(Qt::Key key, const QRectF &sceneBounds)
 {
-    if (!scene()) { qWarning() << "玩家不在场景中。无法移动。"; return; }
+    if (m_isBusyWithStation) {
+        return;
+    }
+    if (!scene()) { return; }
     QRectF playerLocalBounds = this->boundingRect();
     QPointF currentPos = this->pos();
     qreal tentativeNewX = currentPos.x(), tentativeNewY = currentPos.y();
@@ -80,7 +72,6 @@ void Player::handleMovementKey(Qt::Key key, const QRectF &sceneBounds)
         if (item == this) continue;
         if (item->data(ITEM_TYPE_ROLE).toString() == TYPE_OBSTACLE && item->parentItem() != this) {
             collisionWithObstacle = true;
-            qDebug() << "检测到与障碍物碰撞：" << item->data(ITEM_NAME_ROLE).toString();
             break;
         }
     }
@@ -95,188 +86,281 @@ void Player::handleMovementKey(Qt::Key key, const QRectF &sceneBounds)
 
 void Player::attemptPickupFromSource()
 {
-    if (!scene()) return;
-    qDebug() << "尝试通过空格键从源拾取物品...";
+    // qDebug() << "Player::attemptPickupFromSource called. IsBusy:" << m_isBusyWithStation;
+    if (m_isBusyWithStation) { qDebug() << "玩家正忙，无法拾取。"; return; }
+    if (!scene()) {
+        // qDebug() << "Player::attemptPickupFromSource - Scene is null.";
+        return;
+    }
     QList<QGraphicsItem*> itemsUnderPlayer = scene()->collidingItems(this, Qt::IntersectsItemShape);
+    // qDebug() << "Player::attemptPickupFromSource - Items under player:" << itemsUnderPlayer.size();
     for (QGraphicsItem *sourceItem : itemsUnderPlayer) {
-        if (sourceItem->data(ITEM_TYPE_ROLE).toString() == TYPE_COLLECTIBLE_VEGETABLE_SOURCE && sourceItem->parentItem() == nullptr) {
+        QString itemType = sourceItem->data(ITEM_TYPE_ROLE).toString();
+        // QString itemNameRole = sourceItem->data(ITEM_NAME_ROLE).toString();
+        // qDebug() << "Player::attemptPickupFromSource - Checking item:" << itemNameRole << "Type:" << itemType;
+        if (itemType == TYPE_COLLECTIBLE_VEGETABLE_SOURCE && sourceItem->parentItem() == nullptr) {
             QString itemName = sourceItem->data(ITEM_NAME_ROLE).toString();
-            m_inventory[itemName]++;
-            qDebug() << "从源拾取了 '" << itemName << "'。物品栏中 '" << itemName << "' 数量: " << m_inventory[itemName];
-            addVisualHeldItem(itemName);
-            break;
+            if (!itemName.isEmpty()) {
+                m_inventory[itemName]++;
+                addVisualHeldItem(itemName);
+                qDebug() << "玩家拾取了: " << itemName << "。当前数量: " << m_inventory[itemName] << "库存详情:" << m_inventory;
+                break;
+            }
         }
     }
 }
 
+
 void Player::attemptInteractWithStation() {
-    if (!scene()) return;
-    qDebug() << "尝试与工作站交互 (按 'E')...";
+    // qDebug() << "Player::attemptInteractWithStation called. IsBusy:" << m_isBusyWithStation;
+    if (m_isBusyWithStation) {
+        qDebug() << "玩家正忙(例如处理中)，无法开始新的工作站交互。";
+        return;
+    }
+    if (!scene()) {
+        //qDebug() << "Player::attemptInteractWithStation - Scene is null.";
+        return;
+    }
+    //qDebug() << "尝试与工作站交互 (按 'E')... 玩家库存:" << m_inventory;
 
     QList<QGraphicsItem*> itemsUnderPlayer = scene()->collidingItems(this, Qt::IntersectsItemShape);
     QGraphicsItem* targetStationItem = nullptr;
-
     for (QGraphicsItem* item : itemsUnderPlayer) {
         QString itemType = item->data(ITEM_TYPE_ROLE).toString();
-        if (itemType == TYPE_CHOPPING_STATION ||
-            itemType == TYPE_SALAD_ASSEMBLY_STATION ||
-            itemType == TYPE_SERVING_HATCH) {
+        // qDebug() << "Player::attemptInteractWithStation - Checking nearby item type:" << itemType << "Name:" << item->data(ITEM_NAME_ROLE).toString();
+        if (itemType == TYPE_CHOPPING_STATION || itemType == TYPE_SALAD_ASSEMBLY_STATION ||
+            itemType == TYPE_SERVING_HATCH || itemType == TYPE_FRYING_STATION) {
             targetStationItem = item;
+            // qDebug() << "Player::attemptInteractWithStation - Found target station:" << item->data(ITEM_NAME_ROLE).toString() << "Type:" << itemType;
             break;
         }
     }
 
-    if (!targetStationItem) {
-        qDebug() << "附近没有可交互的工作站。";
-        return;
-    }
-
     QString stationType = targetStationItem->data(ITEM_TYPE_ROLE).toString();
+    // qDebug() << "Player::attemptInteractWithStation - Interacting with station type:" << stationType;
 
     if (stationType == TYPE_CHOPPING_STATION) {
         ChoppingStationItem* choppingStation = static_cast<ChoppingStationItem*>(targetStationItem);
+        if (choppingStation->isChopping()) { return; }
         if (choppingStation->isEmpty()) {
             QString itemToPlaceName;
             for (auto it = m_inventory.constBegin(); it != m_inventory.constEnd(); ++it) {
-                if (it.value() > 0 && !it.key().endsWith("_已切")) { itemToPlaceName = it.key(); break; }
+                if (it.value() > 0 && !it.key().endsWith("_已切") && !it.key().endsWith("_已煎") && it.key() != PRODUCT_SALAD && it.key() != PRODUCT_BURGER) {
+                    if (it.key() == RAW_TOMATO || it.key() == RAW_LETTUCE || it.key() == RAW_MEAT) {
+                        itemToPlaceName = it.key(); break;
+                    }
+                }
             }
             if (!itemToPlaceName.isEmpty()) {
                 QString rawItemImagePath = Player::getImagePathForItem(itemToPlaceName);
                 if (!rawItemImagePath.isEmpty() && choppingStation->placeVegetable(itemToPlaceName, rawItemImagePath)) {
-                    qDebug() << "玩家将 '" << itemToPlaceName << "' 放置到切菜板。";
                     tryTakeFromInventory(itemToPlaceName);
-                } else { qDebug() << "无法放置 '" << itemToPlaceName << "' 到切菜板。"; }
-            } else { qDebug() << "物品栏中没有可放置的【未切的】蔬菜。"; }
+                }
+            }
         } else if (!choppingStation->isCut()) {
-            QString rawVegetableName = choppingStation->getPlacedVegetableName();
-            QString cutItemName = rawVegetableName + "_已切"; // 构造切好的物品名
-            QString cutVegetableImagePath = Player::getImagePathForItem(cutItemName); // 获取切好的图片路径
-            if (!cutVegetableImagePath.isEmpty() && choppingStation->chopVegetable(cutVegetableImagePath)) {
-                qDebug() << "'" << rawVegetableName << "' 已在砧板上切好！现在是 '" << choppingStation->getCurrentVisualNameOnBoard() << "'";
-            } else { qWarning() << "切菜失败，可能没有 '" << rawVegetableName << "' 对应的已切图片。"; }
-        } else { // 砧板上有已切蔬菜，取回
-            QString cutVegName = choppingStation->takeVegetable(); // 从砧板取走，返回 "XX_已切"
-            if (!cutVegName.isEmpty()) {
-                m_inventory[cutVegName]++;
-                addVisualHeldItem(cutVegName);
-                qDebug() << "'" << cutVegName << "' 已从砧板取回到物品栏。";
+            QString rawItemNameOnBoard = choppingStation->getPlacedVegetableName();
+            QString cutItemName = rawItemNameOnBoard + "_已切";
+            QString cutItemImagePath = Player::getImagePathForItem(cutItemName);
+            if (!cutItemImagePath.isEmpty()) {
+                int choppingTimeMs = 3000;
+                if (choppingStation->startChoppingProcess(rawItemNameOnBoard, cutItemImagePath, choppingTimeMs)) {
+                    m_isBusyWithStation = true;
+                }
+            }
+        } else {
+            QString cutItemName = choppingStation->takeVegetable();
+            if (!cutItemName.isEmpty()) {
+                m_inventory[cutItemName]++; addVisualHeldItem(cutItemName);
+            }
+        }
+    } else if (stationType == TYPE_FRYING_STATION) {
+        FryingStationItem* fryingStation = static_cast<FryingStationItem*>(targetStationItem);
+        if (fryingStation->isFrying()) { return; }
+        if (fryingStation->isEmpty()) {
+            if (m_inventory.contains(CUT_MEAT) && m_inventory.value(CUT_MEAT) > 0) {
+                QString cutMeatImagePath = Player::getImagePathForItem(CUT_MEAT);
+                if (!cutMeatImagePath.isEmpty() && fryingStation->placeItem(CUT_MEAT, cutMeatImagePath)) {
+                    tryTakeFromInventory(CUT_MEAT);
+                }
+            }
+        } else if (!fryingStation->isFried()) {
+            QString itemOnBoard = fryingStation->getPlacedItemName();
+            if (itemOnBoard == CUT_MEAT) {
+                QString friedMeatImagePath = Player::getImagePathForItem(FRIED_MEAT);
+                if (!friedMeatImagePath.isEmpty()) {
+                    int fryingTimeMs = 3000;
+                    if (fryingStation->startFryingProcess(CUT_MEAT, friedMeatImagePath, fryingTimeMs)) {
+                        m_isBusyWithStation = true;
+                    }
+                }
+            }
+        } else {
+            QString friedItemName = fryingStation->takeItem();
+            if (!friedItemName.isEmpty()) {
+                m_inventory[friedItemName]++; addVisualHeldItem(friedItemName);
             }
         }
     } else if (stationType == TYPE_SALAD_ASSEMBLY_STATION) {
-        SaladAssemblyStationItem* saladStation = static_cast<SaladAssemblyStationItem*>(targetStationItem);
-        if (saladStation->canProduceSalad()) {
-            QString saladProduct = saladStation->produceAndTakeSalad();
-            if (!saladProduct.isEmpty()) {
-                m_inventory[saladProduct]++;
-                addVisualHeldItem(saladProduct);
-                qDebug() << "成功制作并获得了 '" << saladProduct << "'!";
+        SaladAssemblyStationItem* assemblyStation = static_cast<SaladAssemblyStationItem*>(targetStationItem);
+        QList<QString> producible = assemblyStation->getProducibleItems();
+        qDebug() << "Player::attemptInteractWithStation - ASSEMBLY STATION. Producible items from station:" << producible;
+        qDebug() << "Player::attemptInteractWithStation - Current ingredients on assembly board:" << assemblyStation->getCurrentIngredientsOnBoard();
+
+        if (!producible.isEmpty()) {
+            qDebug() << "Player: Assembly station CAN produce something. Producible list:" << producible;
+            qDebug() << "Player: Checking for PRODUCT_BURGER ('" << PRODUCT_BURGER << "') in producible list.";
+            qDebug() << "Player: Checking for PRODUCT_SALAD ('" << PRODUCT_SALAD << "') in producible list.";
+
+            QString itemToProduce = "";
+
+            bool canMakeBurger = producible.contains(PRODUCT_BURGER);
+            bool canMakeSalad = producible.contains(PRODUCT_SALAD);
+
+            qDebug() << "Player: Can make Burger?" << canMakeBurger << "(Value of PRODUCT_BURGER: " << PRODUCT_BURGER << ")";
+            qDebug() << "Player: Can make Salad?" << canMakeSalad << "(Value of PRODUCT_SALAD: " << PRODUCT_SALAD << ")";
+
+            if (canMakeBurger) {
+                itemToProduce = PRODUCT_BURGER;
+                qDebug() << "Player: Prioritizing Burger. itemToProduce set to:" << itemToProduce;
+            } else if (canMakeSalad) {
+                itemToProduce = PRODUCT_SALAD;
+                qDebug() << "Player: Burger not producible (or not found in producible list), prioritizing Salad. itemToProduce set to:" << itemToProduce;
+            } else if (!producible.isEmpty()) {
+                itemToProduce = producible.first();
+                qDebug() << "Player: Fallback - neither Burger nor Salad specifically selected. Taking first producible:" << itemToProduce;
+            }
+
+            qDebug() << "Player: Final item selected to produce:" << itemToProduce;
+
+            if (!itemToProduce.isEmpty()) {
+                QString producedItem = assemblyStation->produceAndTakeItem(itemToProduce);
+                if (!producedItem.isEmpty()) {
+                    m_inventory[producedItem]++;
+                    addVisualHeldItem(producedItem);
+                    qDebug() << "玩家从组装台获得了: " << producedItem << "库存详情:" << m_inventory;
+                    return;
+                } else {
+                    qDebug() << "ProduceAndTakeItem for" << itemToProduce << "returned empty. Station state might have changed or item not truly producible by station logic.";
+                }
+            } else {
+                qDebug() << "No item was selected to produce from the producible list, or list was empty after checks (itemToProduce is empty).";
             }
         } else {
-            QString cutItemToPlace;
-            for (auto it = m_inventory.constBegin(); it != m_inventory.constEnd(); ++it) {
-                if (it.value() > 0 && it.key().endsWith("_已切")) {
-                    cutItemToPlace = it.key(); break;
+            qDebug() << "Player: Assembly station CANNOT produce anything. Trying to place ingredient.";
+            QString ingredientToPlace;
+            QStringList potentialIngredients;
+
+            potentialIngredients << PRODUCT_SALAD << BREAD_SLICE << FRIED_MEAT << CUT_TOMATO << CUT_LETTUCE;
+
+
+            for (const QString& invItem : m_inventory.keys()) {
+                if (m_inventory.value(invItem) > 0 && potentialIngredients.contains(invItem)) {
+                    ingredientToPlace = invItem;
+                    qDebug() << "Player: Found potential ingredient in inventory to place:" << ingredientToPlace;
+                    break;
                 }
             }
-            if (!cutItemToPlace.isEmpty()) {
-                if (saladStation->tryAddCutIngredient(cutItemToPlace)) {
-                    qDebug() << "玩家将 '" << cutItemToPlace << "' 放置到沙拉组装台。";
-                    tryTakeFromInventory(cutItemToPlace);
-                } else { qDebug() << "无法将 '" << cutItemToPlace << "' 放置到沙拉组装台。"; }
-            } else { qDebug() << "物品栏中没有可放置到沙拉组装台的【已切的】蔬菜。"; }
+            qDebug() << "Player inventory check for assembly: ingredientToPlace =" << ingredientToPlace;
+            if (!ingredientToPlace.isEmpty()) {
+                if (assemblyStation->tryAddIngredient(ingredientToPlace)) {
+                    tryTakeFromInventory(ingredientToPlace);
+                    qDebug() << "玩家将 " << ingredientToPlace << " 放入组装台。";
+                } else {
+                    qDebug() << "无法将 " << ingredientToPlace << " 放入组装台 (tryAddIngredient returned false).";
+                }
+            } else {
+                qDebug() << "玩家物品栏中没有可放入组装台的配料，或者组装台不需要。";
+            }
         }
     } else if (stationType == TYPE_SERVING_HATCH) {
+        qDebug() << "Player Attempt: Interacting with serving hatch.";
         ServingHatchItem* servingHatch = static_cast<ServingHatchItem*>(targetStationItem);
-        qDebug() << "与上菜口交互...";
-        if (m_inventory.contains(PRODUCT_SALAD) && m_inventory.value(PRODUCT_SALAD) > 0) {
-            if (servingHatch->serveOrder(PRODUCT_SALAD)) {
-                qDebug() << "成功将一份 '" << PRODUCT_SALAD << "' 上菜！";
-                tryTakeFromInventory(PRODUCT_SALAD);
-            } else { qDebug() << "上菜失败。"; }
-        } else { qDebug() << "物品栏中没有 '" << PRODUCT_SALAD << "' 可以上菜。"; }
+        QString itemToServe;
+        if (m_inventory.contains(PRODUCT_BURGER) && m_inventory.value(PRODUCT_BURGER) > 0) {
+            itemToServe = PRODUCT_BURGER;
+        } else if (m_inventory.contains(PRODUCT_SALAD) && m_inventory.value(PRODUCT_SALAD) > 0) {
+            itemToServe = PRODUCT_SALAD;
+        }
+        qDebug() << "Player: Item to serve:" << itemToServe;
+        if (!itemToServe.isEmpty()) {
+            if (servingHatch->serveOrder(itemToServe)) {
+                tryTakeFromInventory(itemToServe);
+                qDebug() << "玩家提交了 " << itemToServe;
+            } else {
+                qDebug() << "玩家提交 " << itemToServe << " 失败 (serveOrder returned false).";
+            }
+        } else {
+            qDebug() << "玩家物品栏中没有可上菜的成品。";
+        }
     }
 }
 
-void Player::addVisualHeldItem(const QString& itemName)
-{
+
+void Player::onVegetableChopped(const QString& originalItemName, const QString& /*cutImagePathUsedByStation*/) {
+    qDebug() << "Player::onVegetableChopped called for" << originalItemName << ". Setting m_isBusyWithStation to false.";
+    m_isBusyWithStation = false;
+}
+
+void Player::onMeatFried(const QString& originalCutMeatName, const QString& /*friedMeatImagePathUsed*/) {
+    qDebug() << "Player::onMeatFried called for" << originalCutMeatName << ". Setting m_isBusyWithStation to false.";
+    m_isBusyWithStation = false;
+}
+
+void Player::addVisualHeldItem(const QString& itemName) {
     QString itemImagePath = Player::getImagePathForItem(itemName);
-    if (itemImagePath.isEmpty()) {
-        qWarning() << "Player Error: 为视觉物品 '" << itemName << "' 获取图片路径失败。";
-        return;
-    }
-    QPixmap itemPixmap(itemImagePath);
-    if (itemPixmap.isNull()) {
-        qWarning() << "Player Error: 加载视觉物品图片失败: " << itemImagePath << " for " << itemName;
-        return;
-    }
+    if(itemImagePath.isEmpty()){qWarning()<<"P:No img path for "<<itemName;return;}
+    QPixmap p(itemImagePath);
+    if(p.isNull()){qWarning()<<"P:Cannot load img "<<itemImagePath<<" for "<<itemName;return;}
 
-    if (m_visualHeldItems.size() >= m_maxVisualHeldItems && !m_visualHeldItems.isEmpty()) {
-        QGraphicsPixmapItem* oldestItem = m_visualHeldItems.takeFirst();
-        delete oldestItem; // 从场景中删除并释放内存
+    if(m_visualHeldItems.size() >= m_maxVisualHeldItems && !m_visualHeldItems.isEmpty()){
+        QGraphicsPixmapItem* toDelete = m_visualHeldItems.takeFirst();
+        if (toDelete) {
+            delete toDelete;
+        }
     }
-
-    QGraphicsPixmapItem* visualCopy = new QGraphicsPixmapItem(itemPixmap.scaled(25, 25, Qt::KeepAspectRatio, Qt::SmoothTransformation), this); // 父项是Player
-    visualCopy->setData(ITEM_NAME_ROLE, itemName + "_visual_copy"); // 标记视觉副本
-    m_visualHeldItems.append(visualCopy);
+    QGraphicsPixmapItem* v = new QGraphicsPixmapItem(p.scaled(25,25,Qt::KeepAspectRatio,Qt::SmoothTransformation), this);
+    v->setData(ITEM_NAME_ROLE, itemName+"_visual_copy");
+    m_visualHeldItems.append(v);
     updateHeldItemPositions();
-    qDebug() << "添加了视觉物品：" << itemName + "_visual_copy";
 }
 
-void Player::updateHeldItemPositions()
-{
-    qreal currentYOffset = - (this->boundingRect().height() * 0.6f); // 调整起始Y偏移，使其更靠上
-    qreal spacing = 1; // 物品之间的垂直间距
-    // 从后往前迭代列表 (最新添加的物品)，让它们堆叠在最上方 (离角色头最近)
-    for (int i = m_visualHeldItems.size() - 1; i >= 0; --i) {
+void Player::updateHeldItemPositions() {
+    qreal currentY = -(this->boundingRect().height() * 0.2f);
+    const qreal spacing = 2.0;
+    const qreal itemHeight = 25.0;
+
+    for(int i = 0; i < m_visualHeldItems.size(); ++i){
         QGraphicsPixmapItem* item = m_visualHeldItems.at(i);
-        qreal itemHeight = item->boundingRect().height();
         qreal itemWidth = item->boundingRect().width();
-        // 水平居中于玩家
-        item->setPos((this->boundingRect().width() - itemWidth) / 2.0, currentYOffset - itemHeight);
-        currentYOffset -= (itemHeight + spacing); // 为下一个（更早添加的）物品准备更高的位置
+        item->setPos((this->boundingRect().width() - itemWidth) / 2.0, currentY - (itemHeight + spacing) * i - itemHeight);
     }
 }
 
 bool Player::tryTakeFromInventory(const QString& itemName, int count) {
-    if (m_inventory.contains(itemName) && m_inventory[itemName] >= count) {
+    if(m_inventory.contains(itemName) && m_inventory[itemName] >= count){
         m_inventory[itemName] -= count;
-        if (m_inventory[itemName] == 0) {
+        if(m_inventory[itemName] == 0){
             m_inventory.remove(itemName);
         }
-        // 消耗了物品，对应地移除一个视觉表示
         removeVisualHeldItem(itemName);
-        qDebug() << "'" << itemName << "' (数量: " << count << ") 已从物品栏消耗。剩余: " << m_inventory.value(itemName, 0);
+        qDebug() << "Player: Took" << itemName << "from inventory. Remaining:" << m_inventory.value(itemName, 0) << "Full inv:" << m_inventory;
         return true;
     }
-    qDebug() << "物品栏中 '" << itemName << "' 数量不足 (需要: " << count << ", 拥有: " << m_inventory.value(itemName,0) << ")";
+    qDebug() << "Player: Failed to take" << itemName << "from inventory. Has:" << m_inventory.value(itemName,0) << "Needs:" << count;
     return false;
 }
 
 void Player::removeVisualHeldItem(const QString& itemName) {
-    QString targetVisualCopyName = itemName + "_visual_copy";
-    for (int i = m_visualHeldItems.size() - 1; i >= 0; --i) {
-        // 为了精确匹配，视觉物品也应该存储原始物品名，或者有一个更可靠的ID
-        // 当前简单地通过构造的"_visual_copy"名称来匹配
-        if (m_visualHeldItems.at(i)->data(ITEM_NAME_ROLE).toString() == targetVisualCopyName) {
-            QGraphicsPixmapItem* visualItem = m_visualHeldItems.takeAt(i); // 从列表中移除
-            // 因为 visualItem 是 Player 的子项，当 Player 被删除时，它会被自动删除。
-            // 或者，如果希望立即从场景中消失并不再跟随，可以：
-            // visualItem->setParentItem(nullptr); // 解除父子关系
-            // scene()->removeItem(visualItem); // 如果解除了父子关系，需要从场景中移除
-            delete visualItem; // 直接删除 (如果父项是 this, Qt会处理好)
-            updateHeldItemPositions(); // 更新剩余物品的位置
-            qDebug() << "移除了视觉物品：" << targetVisualCopyName;
-            return; // 通常一次只移除一个匹配的
+    QString visualCopyName = itemName + "_visual_copy";
+    for(int i = m_visualHeldItems.size() - 1; i >= 0; --i){
+        if(m_visualHeldItems.at(i)->data(ITEM_NAME_ROLE).toString() == visualCopyName){
+            QGraphicsPixmapItem* toDelete = m_visualHeldItems.takeAt(i);
+            if (toDelete) {
+                delete toDelete;
+            }
+            updateHeldItemPositions();
+            return;
         }
     }
-    // 如果没有精确匹配到带 "_visual_copy" 后缀的，
-    // 可能是因为 addVisualHeldItem 之前没有正确设置这个data，
-    // 或者要移除的 itemName 已经是 "沙拉" 这种没有原始/已切状态区分的成品。
-    // 对于这种情况，可以尝试不加后缀查找，或者移除最后一个作为通用策略。
-    // 但最稳妥的是确保 addVisualHeldItem 时设置的 ITEM_NAME_ROLE 与这里查找的逻辑一致。
-    qDebug() << "警告：尝试移除视觉物品 '" << targetVisualCopyName << "' 但未在列表中精确找到。可能是因为名称不匹配或列表已空。";
 }
-
-const QMap<QString, int>& Player::getInventory() const {
-    return m_inventory;
-}
+const QMap<QString, int>& Player::getInventory() const { return m_inventory; }
