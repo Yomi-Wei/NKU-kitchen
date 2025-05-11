@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>player_character.png</file>
+        <file>tomato_raw.png</file>
+        <file>lettuce_raw.png</file>
+        <file>tomato_cut.png</file>
+        <file>lettuce_sliced.png</file>
+        <file>kitchen_background.png</file>
+        <file>salad_final.png</file>
+        <file>start_background.jpg</file>
+    </qresource>
+</RCC>
