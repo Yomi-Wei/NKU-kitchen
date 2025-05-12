@@ -1,5 +1,5 @@
 #include "servinghatchitem.h"
-#include "item_definitions.h" // 确保包含
+#include "item_definitions.h"
 #include <QDebug>
 
 ServingHatchItem::ServingHatchItem(const QPixmap& pixmap, QGraphicsItem *parent)

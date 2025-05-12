@@ -34,8 +34,8 @@ signals:
     void fryingCompleted(const QString& originalItemName, const QString& friedItemImagePathUsed);
 
 private slots:
-    void onFryingTimerTimeout();    // 主定时器，用于煎制完成
-    void updateFryingProgress();    // 用于更新进度条视觉效果的定时器槽函数
+    void onFryingTimerTimeout();
+    void updateFryingProgress();
 
 private:
     QString m_placedItemName;

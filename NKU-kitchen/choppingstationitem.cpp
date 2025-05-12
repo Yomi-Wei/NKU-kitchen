@@ -156,7 +156,7 @@ QString ChoppingStationItem::takeVegetable() {
         delete m_visualVegetableOnBoard;
         m_visualVegetableOnBoard = nullptr;
     }
-    QString originalPlacedName = m_placedVegetableName; // 用于debug
+    QString originalPlacedName = m_placedVegetableName;
     m_placedVegetableName.clear();
     m_placedVegetableImagePath.clear();
     bool wasCut = m_isCut;
@@ -208,7 +208,6 @@ bool ChoppingStationItem::startChoppingProcess(const QString& rawVegNameCurrentl
 
 
 void ChoppingStationItem::updateChoppingProgress() {
-    // qDebug() << "ChoppingStationItem::updateChoppingProgress called. Elapsed:" << m_elapsedChoppingTimeMs << "/" << m_totalChoppingTimeMs; // 会产生大量输出
     if (!m_isChopping || !m_progressBarForeground || !m_progressBarBackground) {
         resetProgressBar();
         return;

@@ -32,4 +32,11 @@ const QString FRIED_MEAT = CUT_MEAT + "_已煎";
 const QString PRODUCT_SALAD = "沙拉";
 const QString PRODUCT_BURGER = "汉堡";
 
+const QString CHARACTER_A_ID = "player_a"; // 角色A的ID
+const QString CHARACTER_B_ID = "player_b"; // 角色B的ID
+
+// 角色对应的图片路径
+const QString CHARACTER_A_SPRITE_PATH = ":/images/player_character.png"; // 现有角色图片
+const QString CHARACTER_B_SPRITE_PATH = ":/images/player_b_character.png"; // 新角色图片
+
 #endif

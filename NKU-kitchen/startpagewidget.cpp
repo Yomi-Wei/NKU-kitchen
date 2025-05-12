@@ -11,7 +11,7 @@ StartPageWidget::StartPageWidget(QWidget *parent) : QWidget(parent)
     mainLayout->setSpacing(30);
     mainLayout->setAlignment(Qt::AlignCenter);
 
-    titleLabel = new QLabel("厨房历险记(NKU-kitchen)", this);
+    titleLabel = new QLabel("NKU-kitchen", this);
     QFont titleFont("Arial", 40, QFont::Bold);
     titleLabel->setFont(titleFont);
     titleLabel->setAlignment(Qt::AlignCenter);

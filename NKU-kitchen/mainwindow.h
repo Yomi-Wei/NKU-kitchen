@@ -6,12 +6,15 @@
 #include <QGraphicsView>
 #include <QString>
 #include <QList>
-#include "item_definitions.h"
+#include <QTimer>
+
+#include "item_definitions.h" // 包含角色定义常量
 
 class GameScene;
 class Player;
 class ServingHatchItem;
 class StartPageWidget;
+class CharacterSelectionWidget;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -30,12 +33,19 @@ protected:
 
 private slots:
     void handleOrderServed(const QString& itemName, int points);
-    void switchToGamePage();
+    // void switchToGamePage(); 这个槽不再直接由 StartPageWidget 调用
+    void onOrderTimerTimeout();
+    void updateOrderCountdownDisplay();
+
+    void switchToCharacterSelectionPage(); // 切换到角色选择页面的槽
+    void handleCharacterSelectedAndStartGame(const QString& characterSpritePath);
+    void switchToStartPage(); // 从角色选择返回到开始页面
 
 private:
     Ui::MainWindow *ui;
     QStackedWidget *stackedWidget;
     StartPageWidget *startPage;
+    CharacterSelectionWidget *characterSelectionPage; //角色选择页面实例
     QWidget *gamePageWidget;
 
     GameScene *scene;
@@ -43,16 +53,22 @@ private:
     Player *player;
     ServingHatchItem *m_servingHatch;
     int m_score;
-    QString m_currentOrder; // 存储当前订单的产品键名，例如 PRODUCT_SALAD
+    QString m_currentOrder;
 
     QList<QString> m_orderQueue;
     int m_currentOrderIndex;
+
+    QTimer* m_orderTimer;
+    QTimer* m_orderDisplayUpdateTimer;
+    int m_currentOrderTimeLimitMs;
+    int m_currentOrderTimeLeftSeconds;
+
+    QString m_selectedCharacterSpritePath; //
 
     void setupGameUI();
     void updateScoreDisplay();
     void initializeOrderQueue();
     void generateNewOrder();
-
 
     bool m_gameIsRunning;
 };

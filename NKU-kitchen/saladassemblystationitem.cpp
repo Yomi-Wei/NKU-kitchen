@@ -37,17 +37,6 @@ void SaladAssemblyStationItem::initializeRecipes() {
     qDebug() << "New Burger recipe ('" << PRODUCT_BURGER << "'):" << newBurgerRecipe;
 }
 
-// tryAddIngredient, checkAvailableRecipes, produceAndTakeItem,
-// getCurrentIngredientsOnBoard, updateVisualIngredients, clearVisualIngredients
-// 这些方法的现有逻辑应该能够处理新的配方，因为它们是基于 m_recipes 动态工作的。
-// 我们需要确保 tryAddIngredient 能够接受 PRODUCT_SALAD 作为一种有效的 ingredientName。
-// 当前的 tryAddIngredient 逻辑：
-// for (auto recipeIt = m_recipes.constBegin(); recipeIt != m_recipes.constEnd(); ++recipeIt) {
-//     const QMap<QString, int>& currentRecipeIngredients = recipeIt.value();
-//     if (currentRecipeIngredients.contains(ingredientName)) { ... }
-// }
-// 这个逻辑应该可以正确处理 PRODUCT_SALAD 作为汉堡配方的一部分。
-
 bool SaladAssemblyStationItem::tryAddIngredient(const QString& ingredientName)
 {
     qDebug() << "SaladAssemblyStationItem::tryAddIngredient - Attempting to add:" << ingredientName
@@ -67,8 +56,6 @@ bool SaladAssemblyStationItem::tryAddIngredient(const QString& ingredientName)
                 qDebug() << "Ingredient" << ingredientName << "can be added for recipe" << recipeIt.key()
                          << "(Need:" << neededForThisRecipe
                          << ", Have:" << haveOnBoard << ")";
-                // 对于一个配料，只要它对至少一个需要它的配方来说是不足的，就应该允许添加。
-                // 如果它对所有需要它的配方都已经足够了，那么 canBeAdded 会保持 false。
             } else {
                 qDebug() << "Ingredient" << ingredientName << "is at/over limit for recipe" << recipeIt.key()
                 << "(Need:" << neededForThisRecipe

@@ -4,18 +4,18 @@
 #include <QGraphicsPixmapItem>
 #include <QObject>
 #include <QString>
-#include <QTimer> // 为了切菜耗时
+#include <QTimer>
 #include "item_definitions.h"
 
-// 前向声明
-class QGraphicsRectItem; // 用于进度条
+
+class QGraphicsRectItem;
 
 class ChoppingStationItem : public QObject, public QGraphicsPixmapItem
 {
     Q_OBJECT
 public:
     explicit ChoppingStationItem(const QPixmap& pixmap, QGraphicsItem *parent = nullptr);
-    ~ChoppingStationItem(); // 添加析构函数
+    ~ChoppingStationItem();
 
     bool placeVegetable(const QString& vegetableName, const QString& vegetableImagePath);
     QString getPlacedVegetableName() const;
@@ -32,8 +32,8 @@ signals:
     void choppingCompleted(const QString& originalVegetableName, const QString& cutImagePathUsed);
 
 private slots:
-    void onChoppingTimerTimeout(); // 主定时器，用于切菜完成
-    void updateChoppingProgress(); // 用于更新进度条视觉效果的定时器槽函数
+    void onChoppingTimerTimeout();
+    void updateChoppingProgress();
 
 private:
     QString m_placedVegetableName;
